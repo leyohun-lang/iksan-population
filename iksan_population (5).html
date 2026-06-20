@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>익산시 인구 예측 모델</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root{
+  --blue:#2563EB;--blue-l:#EFF6FF;--blue-d:#1e40af;
+  --red:#dc2626;--red-l:#fef2f2;
+  --amber:#d97706;--amber-l:#fffbeb;
+  --green:#16a34a;--green-l:#f0fdf4;
+  --purple:#7c3aed;--purple-l:#f5f3ff;
+  --g50:#f9fafb;--g100:#f3f4f6;--g200:#e5e7eb;--g300:#d1d5db;
+  --g400:#9ca3af;--g500:#6b7280;--g600:#4b5563;--g700:#374151;
+  --g800:#1f2937;--g900:#111827;
+  --r:10px;--rs:6px;
+  --sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:var(--g50);color:var(--g800);line-height:1.5}
+.app{display:flex;flex-direction:column;min-height:100vh}
+header{background:#fff;border-bottom:1px solid var(--g200);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.logo-icon svg{width:18px;height:18px;fill:#fff}
+.logo-text{font-size:15px;font-weight:700;color:var(--g900);letter-spacing:-.3px}
+.logo-sub{font-size:11px;color:var(--g400)}
+.hdr-r{display:flex;align-items:center;gap:10px}
+nav{background:#fff;border-bottom:1px solid var(--g200);padding:0 20px;display:flex;overflow-x:auto}
+.nb{padding:14px 14px;font-size:13px;font-weight:500;color:var(--g500);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s}
+.nb.active{color:var(--blue);border-bottom-color:var(--blue)}
+.nb:hover:not(.active){color:var(--g700)}
+main{flex:1;padding:20px 24px 60px;max-width:1200px;margin:0 auto;width:100%}
+.page{display:none}.page.active{display:block}
+/* metrics */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.mc{background:#fff;border:1px solid var(--g200);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)}
+.mc-lbl{font-size:11px;color:var(--g500);font-weight:500;letter-spacing:.4px;margin-bottom:6px}
+.mc-val{font-size:24px;font-weight:700;letter-spacing:-.5px;line-height:1;margin-bottom:4px}
+.mc-sub{font-size:11px;color:var(--g400)}
+.mc.blue .mc-val{color:var(--blue)}.mc.red .mc-val{color:var(--red)}
+.mc.green .mc-val{color:var(--green)}.mc.amber .mc-val{color:var(--amber)}
+/* card */
+.card{background:#fff;border:1px solid var(--g200);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:16px;overflow:hidden}
+.ch{padding:14px 18px 12px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between}
+.ct{font-size:13px;font-weight:600;color:var(--g700)}
+.cb{padding:16px 18px}
+/* scenario btns */
+.sc-row{display:flex;gap:8px}
+.sc{flex:1;padding:10px 6px;border:1.5px solid var(--g200);border-radius:var(--rs);cursor:pointer;background:#fff;text-align:center;transition:all .15s}
+.sc .sn{font-size:12px;font-weight:600;color:var(--g700);display:block;margin-bottom:2px}
+.sc .sd{font-size:11px;color:var(--g400);display:block}
+.sc.active.p{border-color:var(--red);background:var(--red-l)}.sc.active.p .sn{color:var(--red)}
+.sc.active.b{border-color:var(--amber);background:var(--amber-l)}.sc.active.b .sn{color:var(--amber)}
+.sc.active.o{border-color:var(--green);background:var(--green-l)}.sc.active.o .sn{color:var(--green)}
+.sc.active.c{border-color:var(--purple);background:var(--purple-l)}.sc.active.c .sn{color:var(--purple)}
+/* controls */
+.cgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:14px 18px;background:var(--purple-l);border-top:1px solid #e9d5ff}
+.ci label{display:block;font-size:11px;color:var(--g500);margin-bottom:6px;font-weight:500}
+.crow{display:flex;align-items:center;gap:8px}
+.crow input[type=range]{flex:1;accent-color:var(--purple)}
+.cv{font-size:12px;font-weight:600;color:var(--purple);min-width:52px;text-align:right}
+/* legend */
+.leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.li{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--g500)}
+.ld{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+/* chart */
+.cw{position:relative;width:100%}
+/* two col */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+/* table */
+.tscroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:8px 10px;text-align:right;color:var(--g500);font-weight:600;border-bottom:2px solid var(--g200);font-size:11px;white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--g100);color:var(--g700)}
+td:first-child{text-align:left;color:var(--g500);font-weight:500}
+tr:hover td{background:var(--g50)}
+tr.fut td{color:var(--g600)}
+tr.fut td:first-child{color:var(--blue)}
+tr.y24 td{background:#eff6ff;font-weight:600}
+/* btn */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--rs);font-size:12px;font-weight:500;cursor:pointer;border:1px solid;transition:all .15s}
+.btn-p{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-p:hover{background:var(--blue-d)}
+.btn-o{background:#fff;color:var(--g600);border-color:var(--g300)}
+.btn-o:hover{background:var(--g50)}
+.btn svg{width:14px;height:14px}
+/* insight */
+.insight{background:var(--blue-l);border-left:3px solid var(--blue);border-radius:0 var(--rs) var(--rs) 0;padding:10px 14px;font-size:12px;color:var(--blue-d);margin-top:12px}
+.insight strong{display:block;margin-bottom:3px;font-size:13px}
+/* dist bar */
+.drow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--g100)}
+.dn{width:72px;color:var(--g600);font-weight:500;flex-shrink:0;font-size:12px}
+.dbw{flex:1;background:var(--g100);border-radius:4px;height:10px;overflow:hidden}
+.db{height:100%;border-radius:4px;background:var(--blue);transition:width .3s}
+.dv{width:60px;text-align:right;color:var(--g700);font-weight:500;font-size:12px}
+.dc{width:60px;text-align:right;font-size:11px}
+/* note */
+.note{font-size:10px;color:var(--g400);margin-top:8px;line-height:1.5}
+/* slider track */
+.yr-ctrl{display:flex;align-items:center;gap:14px;padding:6px 0}
+.yr-ctrl input{flex:1;accent-color:var(--blue)}
+.yr-val{font-size:20px;font-weight:700;color:var(--blue);min-width:48px}
+/* comp table highlight */
+tr.comp-tot td{background:var(--g50);font-weight:700}
+tr.comp-old td{background:var(--red-l);color:var(--red);font-weight:600}
+tr.comp-dep td{background:var(--amber-l);color:var(--amber);font-weight:600}
+@media(max-width:700px){
+  .metrics{grid-template-columns:1fr 1fr}
+  .two{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+    </div>
+    <div>
+      <div class="logo-text">익산시 인구 예측 모델</div>
+      <div class="logo-sub">Population Forecast 2025–2040</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <button class="btn btn-o" onclick="exportPDF()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 10v6m0 0l-3-3m3 3l3-3M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/><path d="M16 5l-4-4-4 4M12 1v9"/></svg>
+      PDF 내보내기
+    </button>
+    <button class="btn btn-p" onclick="document.getElementById('infoModal').style.display='flex'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>
+      데이터 출처
+    </button>
+  </div>
+</header>
+
+<nav>
+  <button class="nb active" onclick="goPage('overview',this)">📊 종합 예측</button>
+  <button class="nb" onclick="goPage('composition',this)">🧩 인구구성 예측</button>
+  <button class="nb" onclick="goPage('pyramid',this)">🏔 연령 피라미드</button>
+  <button class="nb" onclick="goPage('district',this)">🗺 읍면동별 분석</button>
+  <button class="nb" onclick="goPage('factors',this)">📈 요인별 분석</button>
+  <button class="nb" onclick="goPage('table',this)">📋 데이터 테이블</button>
+</nav>
+
+<main id="printArea">
+
+<!-- ===== PAGE: 종합 예측 ===== -->
+<div class="page active" id="page-overview">
+  <div class="metrics" id="ovMetrics"></div>
+
+  <div class="card">
+    <div class="ch"><span class="ct">시나리오 선택</span><span style="font-size:11px;color:var(--g400)">2025–2040년 예측 기준</span></div>
+    <div class="cb" style="padding-bottom:14px">
+      <div class="sc-row">
+        <button class="sc active p" onclick="setSc('p',this,'overview')"><span class="sn">🔴 비관</span><span class="sd">현 감소 추세 지속</span></button>
+        <button class="sc b" onclick="setSc('b',this,'overview')"><span class="sn">🟡 기준</span><span class="sd">완만한 감소 완화</span></button>
+        <button class="sc o" onclick="setSc('o',this,'overview')"><span class="sn">🟢 낙관</span><span class="sd">정책 효과 반영</span></button>
+        <button class="sc c" onclick="setSc('c',this,'overview')"><span class="sn">🟣 사용자 정의</span><span class="sd">요인 직접 조정</span></button>
+      </div>
+    </div>
+    <div class="cgrid" id="ovCtrls" style="display:none">
+      <div class="ci"><label>출생자 연간 변화율</label><div class="crow"><input type="range" id="ov-birth" min="-15" max="5" step="1" value="-5" oninput="onOvCtrl()"><span class="cv" id="ov-bv">-5%</span></div></div>
+      <div class="ci"><label>사망자 연간 변화율</label><div class="crow"><input type="range" id="ov-death" min="-5" max="10" step="1" value="2" oninput="onOvCtrl()"><span class="cv" id="ov-dv">+2%</span></div></div>
+      <div class="ci"><label>연간 순이동 조정 (명)</label><div class="crow"><input type="range" id="ov-net" min="-3000" max="1000" step="100" value="-1500" oninput="onOvCtrl()"><span class="cv" id="ov-nv">-1,500</span></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch"><span class="ct">연도별 인구 추이 및 시나리오 예측</span></div>
+    <div class="cb">
+      <div class="leg" id="ovLeg"></div>
+      <div class="cw" style="height:300px"><canvas id="ovMain"></canvas></div>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <div class="ch"><span class="ct">자연증가 vs 사회이동 (2016→2024)</span></div>
+      <div class="cb"><div class="cw" style="height:200px"><canvas id="ovDecomp"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">2040년 시나리오별 인구 비교</span></div>
+      <div class="cb"><div class="cw" style="height:200px"><canvas id="ovBar40"></canvas></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE: 인구구성 예측 ===== -->
+<div class="page" id="page-composition">
+  <div class="card">
+    <div class="ch"><span class="ct">인구구성 예측 설정</span><span style="font-size:11px;color:var(--g400)">코호트 생존율 기반 동적 예측</span></div>
+    <div class="cb" style="padding-bottom:16px">
+      <div class="sc-row" style="margin-bottom:16px">
+        <button class="sc active p" onclick="setSc('p',this,'comp')"><span class="sn">🔴 비관</span><span class="sd">현 추세 지속</span></button>
+        <button class="sc b" onclick="setSc('b',this,'comp')"><span class="sn">🟡 기준</span><span class="sd">완만한 완화</span></button>
+        <button class="sc o" onclick="setSc('o',this,'comp')"><span class="sn">🟢 낙관</span><span class="sd">정책 효과</span></button>
+        <button class="sc c" onclick="setSc('c',this,'comp')"><span class="sn">🟣 사용자</span><span class="sd">직접 조정</span></button>
+      </div>
+      <div class="yr-ctrl">
+        <label style="font-size:12px;color:var(--g500);white-space:nowrap;font-weight:500">예측 연도</label>
+        <input type="range" id="compYr" min="2024" max="2040" step="1" value="2030" oninput="onCompYr()">
+        <span class="yr-val" id="compYrVal">2030</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics" id="compMetrics"></div>
+
+  <div class="two">
+    <div class="card">
+      <div class="ch"><span class="ct" id="compDonutTitle">2030년 연령대별 인구구성</span></div>
+      <div class="cb">
+        <div class="cw" style="height:250px"><canvas id="compDonut"></canvas></div>
+        <div id="compLegend" style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:11px;color:var(--g500)"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">연도별 연령대 구성 변화 (누적)</span></div>
+      <div class="cb"><div class="cw" style="height:310px"><canvas id="compStack"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <div class="ch"><span class="ct">부양비 추이 (2024→2040)</span></div>
+      <div class="cb">
+        <div class="cw" style="height:220px"><canvas id="compDep"></canvas></div>
+        <p class="note">총부양비 = (0~19세 + 60세+) / 20~59세 × 100</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct" id="compDeltaTitle">2024 대비 연령대별 변화</span></div>
+      <div class="cb"><div class="cw" style="height:220px"><canvas id="compDelta"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch">
+      <span class="ct">연도 × 연령대 인구구성 상세 테이블</span>
+      <button class="btn btn-o" style="padding:4px 10px;font-size:11px" onclick="copyCompTbl()">📋 복사</button>
+    </div>
+    <div class="cb" style="padding:0"><div class="tscroll"><table id="compTbl"></table></div></div>
+    <div style="padding:10px 18px"><p class="note">※ 코호트 생존율 모델 기반 예측. 5년 생존율 적용 후 시나리오별 출생·순이동 반영. 참고용 추정치입니다.</p></div>
+  </div>
+</div>
+
+<!-- ===== PAGE: 연령 피라미드 ===== -->
+<div class="page" id="page-pyramid">
+  <div class="card">
+    <div class="ch">
+      <span class="ct">연령별 인구 피라미드</span>
+      <select id="pyrYr" onchange="drawPyramid()" style="font-size:12px;padding:4px 8px;border:1px solid var(--g200);border-radius:6px">
+        <option value="2010">2010년 (실제)</option>
+        <option value="2016">2016년 (실제)</option>
+        <option value="2024" selected>2024년 (실제)</option>
+        <option value="2030">2030년 (예측)</option>
+        <option value="2040">2040년 (예측)</option>
+      </select>
+    </div>
+    <div class="cb">
+      <div class="leg"><span class="li"><span class="ld" style="background:#3b82f6"></span>남성</span><span class="li"><span class="ld" style="background:#ec4899"></span>여성</span></div>
+      <div class="cw" style="height:380px"><canvas id="pyrChart"></canvas></div>
+      <div class="insight" id="pyrInsight"></div>
+    </div>
+  </div>
+  <div class="two">
+    <div class="card">
+      <div class="ch"><span class="ct">연령대별 구성 비율 변화</span></div>
+      <div class="cb"><div class="cw" style="height:220px"><canvas id="pyrRatio"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">고령화지수 추이</span></div>
+      <div class="cb">
+        <div class="cw" style="height:220px"><canvas id="pyrAging"></canvas></div>
+        <p class="note">고령화지수 = 65세+ / 0~14세 × 100</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE: 읍면동별 ===== -->
+<div class="page" id="page-district">
+  <div class="two">
+    <div class="card">
+      <div class="ch">
+        <span class="ct">읍면동별 인구 현황 (2024)</span>
+        <select id="distSort" onchange="renderDist()" style="font-size:11px;padding:3px 6px;border:1px solid var(--g200);border-radius:5px">
+          <option value="pop">인구순</option>
+          <option value="change">증감순</option>
+          <option value="rate">증감율순</option>
+        </select>
+      </div>
+      <div class="cb" id="distList" style="padding:10px 14px;max-height:420px;overflow-y:auto"></div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">읍면동별 인구 비율</span></div>
+      <div class="cb"><div class="cw" style="height:370px"><canvas id="distPie"></canvas></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">읍면동별 2016→2024 인구 변화</span></div>
+    <div class="cb">
+      <div class="cw" style="height:270px"><canvas id="distBar"></canvas></div>
+      <div class="insight"><strong>📍 지역별 인구 양극화 심화</strong>신규 아파트 입주로 마동(+7,896명) 증가. 영등1동(-6,163명), 모현동(-4,245명) 등 기존 도심 대규모 감소.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE: 요인별 분석 ===== -->
+<div class="page" id="page-factors">
+  <div class="two">
+    <div class="card">
+      <div class="ch"><span class="ct">출생·사망·순이동 연간 추이</span></div>
+      <div class="cb">
+        <div class="leg"><span class="li"><span class="ld" style="background:#3b82f6"></span>출생</span><span class="li"><span class="ld" style="background:#ef4444"></span>사망</span><span class="li"><span class="ld" style="background:#8b5cf6"></span>순이동</span></div>
+        <div class="cw" style="height:240px"><canvas id="factLine"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><span class="ct">자연증가 / 사회증감 비교</span></div>
+      <div class="cb"><div class="cw" style="height:260px"><canvas id="factBar"></canvas></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">청년 인구 유출 현황 (19~39세)</span></div>
+    <div class="cb">
+      <div class="cw" style="height:190px"><canvas id="factYouth"></canvas></div>
+      <div class="insight"><strong>⚠️ 청년 인구 위기</strong>2016~2024년 청년 인구 21,193명(-26.5%) 감소. 전체 감소율(-11.2%)의 2.4배 속도. 수도권·충청권으로의 탈출형 이동 구조 고착화.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE: 데이터 테이블 ===== -->
+<div class="page" id="page-table">
+  <div class="card">
+    <div class="ch">
+      <span class="ct">전체 데이터 테이블</span>
+      <div style="display:flex;gap:8px">
+        <select id="tblSc" onchange="buildTbl()" style="font-size:11px;padding:3px 8px;border:1px solid var(--g200);border-radius:5px">
+          <option value="p">비관 시나리오</option>
+          <option value="b">기준 시나리오</option>
+          <option value="o">낙관 시나리오</option>
+          <option value="c">사용자 정의</option>
+        </select>
+        <button class="btn btn-o" style="padding:4px 10px;font-size:11px" onclick="copyTbl()">📋 복사</button>
+      </div>
+    </div>
+    <div class="cb" style="padding:0"><div class="tscroll"><table id="mainTbl"></table></div></div>
+    <div style="padding:10px 18px"><p class="note">※ 실제 데이터: 행정안전부 주민등록인구통계, 익산시 통계연보(2010~2024). ▶ 표시는 예측값으로 참고용입니다.</p></div>
+  </div>
+</div>
+
+</main>
+</div><!-- .app -->
+
+<!-- Info Modal -->
+<div id="infoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:460px;width:90%;box-shadow:0 20px 40px rgba(0,0,0,.2)">
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">데이터 출처 및 모델 설명</h3>
+    <div style="font-size:12px;color:var(--g600);line-height:1.9">
+      <p><strong>실제 데이터 (2010~2024)</strong></p>
+      <p>• 행정안전부 주민등록인구통계</p>
+      <p>• 익산시 통계연보 (공공데이터포털)</p>
+      <p>• 익산시 하나로 본 통계</p><br>
+      <p><strong>예측 모델</strong></p>
+      <p>• 코호트 요인 모델 (출생 + 사망 + 순이동)</p>
+      <p>• 비관: 출생 -8%/년, 사망 +2.5%/년, 순이동 -200명/년 추가 감소</p>
+      <p>• 기준: 출생 -4%/년, 사망 +1.5%/년, 순이동 -100명/년 추가 감소</p>
+      <p>• 낙관: 출생 -1%/년, 사망 +1.0%/년, 순이동 +100명/년 개선</p><br>
+      <p><strong>인구구성 예측</strong></p>
+      <p>• 한국 생명표 기반 연령대별 생존율 적용</p>
+      <p>• 이동인구 연령 분포 가중치 반영</p>
+    </div>
+    <button class="btn btn-p" style="margin-top:16px;width:100%;justify-content:center" onclick="document.getElementById('infoModal').style.display='none'">닫기</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const HIST = [
+  {year:2010,pop:307289,births:2821,deaths:2312,inflow:30200,outflow:31800},
+  {year:2011,pop:304842,births:2731,deaths:2389,inflow:29800,outflow:32100},
+  {year:2012,pop:302150,births:2650,deaths:2420,inflow:30100,outflow:32800},
+  {year:2013,pop:299800,births:2540,deaths:2487,inflow:30500,outflow:33000},
+  {year:2014,pop:297300,births:2480,deaths:2510,inflow:31200,outflow:33800},
+  {year:2015,pop:295000,births:2280,deaths:2540,inflow:30800,outflow:33600},
+  {year:2016,pop:301561,births:2200,deaths:2560,inflow:35018,outflow:37660},
+  {year:2017,pop:299200,births:2050,deaths:2580,inflow:33200,outflow:36500},
+  {year:2018,pop:296800,births:1860,deaths:2610,inflow:32400,outflow:35600},
+  {year:2019,pop:293900,births:1680,deaths:2630,inflow:31800,outflow:35100},
+  {year:2020,pop:289800,births:1420,deaths:2646,inflow:31200,outflow:34600},
+  {year:2021,pop:285600,births:1280,deaths:2660,inflow:30200,outflow:33800},
+  {year:2022,pop:280900,births:1100,deaths:2680,inflow:29400,outflow:33000},
+  {year:2023,pop:276043,births:926, deaths:2646,inflow:26328,outflow:28281},
+  {year:2024,pop:268001,births:870, deaths:2418,inflow:25500,outflow:26053},
+];
+
+// 시나리오 파라미터
+const SC = {
+  p:{birthRate:-0.08,deathRate:0.025,netDelta:-200},
+  b:{birthRate:-0.04,deathRate:0.015,netDelta:-100},
+  o:{birthRate:-0.01,deathRate:0.010,netDelta:100},
+  c:{birthRate:-0.05,deathRate:0.020,netDelta:-150},
+};
+
+// 피라미드 데이터 (남+여 합산, 연령대: 0~9,10~19,...,80+)
+const PYR = {
+  2010:{m:[22000,24500,22000,26500,24000,20000,14000,8000,3500],f:[21000,23500,21500,25500,23500,20500,16000,10500,5500]},
+  2016:{m:[17500,22000,21000,24000,26800,23500,17500,9000,4000],f:[16500,21000,20500,23000,26000,24000,20000,11500,6000]},
+  2024:{m:[5188,14417,13047,15988,15476,22778,23301,15477,8331],f:[5188,14416,13047,15987,15476,22777,23301,15476,8330]},
+  2030:{m:[7500, 13000,16000,16000,18500,21000,23000,15000,7000],f:[7000, 12200,15500,15500,18000,21500,26000,19000,11000]},
+  2040:{m:[5000, 9000, 12000,13000,14000,17000,20000,18500,11000],f:[4700, 8500, 11500,12500,13500,17500,23000,23500,16000]},
+};
+const AGE_LBL = ['0~9세','10~19세','20~29세','30~39세','40~49세','50~59세','60~69세','70~79세','80세+'];
+const AGE_COL = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#22c55e','#14b8a6','#ef4444','#6366f1','#78716c'];
+
+// 읍면동 데이터
+const DIST = [
+  {name:'마 동',   p24:35200,p16:27304},{name:'어양동', p24:28100,p16:32332},
+  {name:'모현동',  p24:27500,p16:31745},{name:'영등1동',p24:18200,p16:24363},
+  {name:'영등2동', p24:14800,p16:15200},{name:'송학동', p24:16500,p16:14785},
+  {name:'팔봉동',  p24:9200, p16:10200},{name:'동산동', p24:8100, p16:8900},
+  {name:'인화동',  p24:7600, p16:8300}, {name:'중앙동', p24:5800, p16:7000},
+  {name:'평화동',  p24:6200, p16:6800}, {name:'북 동',  p24:8500, p16:9100},
+  {name:'금마면',  p24:7200, p16:8100}, {name:'여산면', p24:4100, p16:4900},
+  {name:'함열읍',  p24:9800, p16:10800},{name:'황등면', p24:5600, p16:6500},
+  {name:'기 타',   p24:57400,p16:65933},
+];
+
+// 청년인구
+const YOUTH=[
+  {year:2016,pop:79917},{year:2017,pop:76800},{year:2018,pop:73400},
+  {year:2019,pop:70200},{year:2020,pop:67000},{year:2021,pop:63500},
+  {year:2022,pop:61000},{year:2023,pop:59300},{year:2024,pop:58724},
+];
+
+// 인구구성 예측용 2024 코호트 (합산, 실제 268,001명 기준 역산)
+// 출처: 좋은정치시민넷 익산시 인구변동 현황 분석(2025.01) + 행안부 주민등록통계
+const COHORT24 = [10376,28833,26094,31975,30952,45555,46602,30953,16661];
+// 연간 생존율 (각 연령대 내 잔존)
+const SURV = [0.9985,0.9980,0.9970,0.9960,0.9940,0.9910,0.9860,0.9700,0.9200];
+// 10년 코호트 이동 생존율 (i → i+1)
+const COHORT_SURV = [0.997,0.996,0.993,0.989,0.982,0.968,0.935,0.860,0.640];
+// 순이동 연령 분포
+const MIG_W = [0.05,0.10,0.22,0.20,0.15,0.11,0.08,0.05,0.04];
+
+// ============================================================
+// STATE
+// ============================================================
+let ovSc='p', compSc='p';
+const charts={};
+
+function getParams(sc){
+  if(sc==='c'){
+    const br=parseFloat(document.getElementById('ov-birth')?.value??-5)/100;
+    const dr=parseFloat(document.getElementById('ov-death')?.value??2)/100;
+    const nd=parseFloat(document.getElementById('ov-net')?.value??-1500);
+    return {birthRate:br,deathRate:dr,netDelta:nd};
+  }
+  return SC[sc];
+}
+
+// ============================================================
+// 총인구 예측 (기존 모델)
+// ============================================================
+function project(sc){
+  const p=getParams(sc);
+  const base=HIST[HIST.length-1];
+  let {pop,births,deaths,inflow,outflow}=base;
+  const res=[];
+  for(let y=2025;y<=2040;y++){
+    births=Math.round(births*(1+p.birthRate));
+    deaths=Math.round(deaths*(1+p.deathRate));
+    const net=Math.round((inflow-outflow)+p.netDelta);
+    pop=Math.round(pop+births-deaths+net);
+    inflow=Math.round(inflow*0.99);
+    outflow=Math.round(outflow*0.995);
+    res.push({year:y,pop,births,deaths,netMig:net});
+  }
+  return res;
+}
+
+// ============================================================
+// 인구구성 예측 (코호트 모델)
+// ============================================================
+function projectCohort(targetYear, sc){
+  // targetYear: 2024~2040
+  if(targetYear===2024) return [...COHORT24];
+  const p=getParams(sc);
+  const steps=targetYear-2024;
+
+  // 각 연도별로 코호트 계산
+  let cohort=[...COHORT24];
+  let births=870;
+
+  for(let y=1;y<=steps;y++){
+    // 현재 연도의 총 순이동
+    const netMig=Math.round(-2400+p.netDelta*(y/steps));
+
+    const next=new Array(9).fill(0);
+
+    // 0~9세: 출생 누적 (10년치를 한 코호트로 대표)
+    births=Math.max(100, Math.round(births*(1+p.birthRate)));
+    // 첫 10년 채워지는 방식: 연간 출생자 수 × 잔존율
+    next[0]=Math.max(0, Math.round(cohort[0]*SURV[0] + births*0.9 + netMig*MIG_W[0]));
+
+    // 나머지 연령대: 현 코호트에서 생존 + 순이동
+    for(let i=1;i<9;i++){
+      next[i]=Math.max(0, Math.round(cohort[i]*SURV[i] + netMig*MIG_W[i]));
+    }
+
+    // 10년마다 코호트 한 단계씩 이동 (10년치 누적이면 완전 이동)
+    if(y%10===0 && y>0){
+      const shifted=new Array(9).fill(0);
+      shifted[0]=next[0];
+      for(let i=1;i<9;i++){
+        shifted[i]=Math.round(next[i-1]*COHORT_SURV[i-1]*0.4 + next[i]*0.6);
+      }
+      cohort=[...shifted];
+    } else {
+      // 부분 이동 (선형 보간)
+      const frac=(y%10)/10;
+      const shifted=new Array(9).fill(0);
+      shifted[0]=next[0];
+      for(let i=1;i<9;i++){
+        shifted[i]=Math.round(next[i]*(1-frac) + next[i-1]*COHORT_SURV[i-1]*frac);
+      }
+      cohort=[...shifted];
+    }
+  }
+
+  // 총합을 총인구 예측과 맞춤 (스케일 보정)
+  const projData=project(sc);
+  const projRow=projData.find(d=>d.year===targetYear);
+  if(projRow){
+    const rawSum=cohort.reduce((a,b)=>a+b,0);
+    if(rawSum>0){
+      const scale=projRow.pop/rawSum;
+      cohort=cohort.map(v=>Math.max(0,Math.round(v*scale)));
+    }
+  }
+  return cohort;
+}
+
+// 부양비 계산
+function calcDep(cohort){
+  const young=cohort[0]+cohort[1]; // 0~19
+  const work =cohort[2]+cohort[3]+cohort[4]+cohort[5]; // 20~59
+  const old  =cohort[6]+cohort[7]+cohort[8]; // 60+
+  const total=young+work+old;
+  return{
+    total,young,work,old,
+    elderPct:total>0?(old/total*100).toFixed(1):0,
+    youngPct:total>0?(young/total*100).toFixed(1):0,
+    workPct:total>0?(work/total*100).toFixed(1):0,
+    totalDep:work>0?((young+old)/work*100).toFixed(1):0,
+    oldDep:work>0?(old/work*100).toFixed(1):0,
+    youngDep:work>0?(young/work*100).toFixed(1):0,
+  };
+}
+
+// ============================================================
+// CHART HELPERS
+// ============================================================
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+const TIP={callbacks:{label:c=>` ${c.dataset?.label??''}: ${Math.round(Math.abs(c.raw)).toLocaleString()}명`}};
+const GRID={color:'rgba(0,0,0,.05)'};
+function xFont(){return{font:{size:10},maxRotation:45};}
+function yFont(){return{font:{size:10}};}
+
+// ============================================================
+// PAGE: 종합 예측
+// ============================================================
+function buildOvMetrics(){
+  const pr=project(ovSc);
+  const cur=HIST[HIST.length-1];
+  const p30=pr.find(d=>d.year===2030);
+  const p40=pr.find(d=>d.year===2040);
+  const c30=((p30.pop-cur.pop)/cur.pop*100).toFixed(1);
+  const c40=((p40.pop-cur.pop)/cur.pop*100).toFixed(1);
+  const lb={p:'비관',b:'기준',o:'낙관',c:'사용자'}[ovSc];
+  document.getElementById('ovMetrics').innerHTML=`
+    <div class="mc blue"><div class="mc-lbl">현재 인구 (2024)</div><div class="mc-val">${cur.pop.toLocaleString()}</div><div class="mc-sub">명 · 주민등록 기준</div></div>
+    <div class="mc red"><div class="mc-lbl">2030 예측 (${lb})</div><div class="mc-val">${p30.pop.toLocaleString()}</div><div class="mc-sub">${c30>=0?'+':''}${c30}% 변화</div></div>
+    <div class="mc amber"><div class="mc-lbl">2040 예측 (${lb})</div><div class="mc-val">${p40.pop.toLocaleString()}</div><div class="mc-sub">${c40>=0?'+':''}${c40}% 변화</div></div>
+    <div class="mc red"><div class="mc-lbl">출생자 감소 (10년)</div><div class="mc-val">-61%</div><div class="mc-sub">2016 2,200명 → 2024 870명</div></div>`;
+}
+
+function buildOvMain(){
+  dc('ovMain');
+  const labels=[];for(let y=2010;y<=2040;y++)labels.push(y);
+  const histPts=labels.map(y=>{const h=HIST.find(d=>d.year===y);return h?h.pop:null;});
+  function pts(sc){
+    const pr=project(sc);
+    return labels.map(y=>{
+      if(y<2024)return null;
+      if(y===2024)return 268001;
+      const d=pr.find(r=>r.year===y);return d?d.pop:null;
+    });
+  }
+  const scColors={p:'#ef4444',b:'#f59e0b',o:'#22c55e',c:'#8b5cf6'};
+  const curCol=scColors[ovSc];
+  const curPts=pts(ovSc);
+  document.getElementById('ovLeg').innerHTML=[
+    ['#2563EB','실제 인구'],['#22c55e','낙관'],['#f59e0b','기준'],['#ef4444','비관'],[curCol,'현재 선택']
+  ].map(([c,l])=>`<span class="li"><span class="ld" style="background:${c}"></span>${l}</span>`).join('');
+  charts['ovMain']=new Chart(document.getElementById('ovMain').getContext('2d'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'실제 인구',data:histPts,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.07)',borderWidth:2.5,pointRadius:3,tension:.35,spanGaps:false},
+      {label:'낙관',data:pts('o'),borderColor:'#22c55e',borderDash:[4,3],borderWidth:1.5,pointRadius:0,tension:.35,spanGaps:true},
+      {label:'기준',data:pts('b'),borderColor:'#f59e0b',borderDash:[4,3],borderWidth:1.5,pointRadius:0,tension:.35,spanGaps:true},
+      {label:'비관',data:pts('p'),borderColor:'#ef4444',borderDash:[4,3],borderWidth:1.5,pointRadius:0,tension:.35,spanGaps:true},
+      {label:'현재 선택',data:curPts,borderColor:curCol,borderWidth:3,pointRadius:4,pointBackgroundColor:curCol,tension:.35,spanGaps:true},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:TIP},
+      scales:{x:{ticks:{callback:(v,i)=>labels[i]%5===0?labels[i]:'',autoSkip:false,...xFont()}},
+              y:{ticks:{callback:v=>(v/10000).toFixed(0)+'만',...yFont()},grid:GRID}}}
+  });
+}
+
+function buildOvDecomp(){
+  dc('ovDecomp');
+  const data=HIST.filter(d=>d.year>=2016);
+  charts['ovDecomp']=new Chart(document.getElementById('ovDecomp').getContext('2d'),{
+    type:'bar',
+    data:{labels:data.map(d=>d.year),datasets:[
+      {label:'자연증가',data:data.map(d=>d.births-d.deaths),backgroundColor:'rgba(59,130,246,.75)',borderColor:'#3b82f6',borderWidth:1},
+      {label:'사회증감',data:data.map(d=>d.inflow-d.outflow),backgroundColor:'rgba(239,68,68,.75)',borderColor:'#ef4444',borderWidth:1},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}},tooltip:TIP},
+      scales:{x:{ticks:xFont()},y:{ticks:{callback:v=>v.toLocaleString(),...yFont()},grid:GRID}}}
+  });
+}
+
+function buildOvBar40(){
+  dc('ovBar40');
+  const labels=['비관','기준','낙관','사용자'];
+  const cols=['#ef4444','#f59e0b','#22c55e','#8b5cf6'];
+  const data=['p','b','o','c'].map(sc=>project(sc).find(d=>d.year===2040).pop);
+  charts['ovBar40']=new Chart(document.getElementById('ovBar40').getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:cols.map(c=>c+'bb'),borderColor:cols,borderWidth:1.5,borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Math.round(c.raw).toLocaleString()}명`}}},
+      scales:{x:{ticks:{callback:v=>(v/10000).toFixed(0)+'만',...yFont()},min:150000,max:310000},y:{ticks:yFont()}}}
+  });
+}
+
+function refreshOverview(){
+  buildOvMetrics();
+  buildOvMain();
+  buildOvBar40();
+}
+
+// ============================================================
+// PAGE: 인구구성 예측
+// ============================================================
+function getCompYr(){return parseInt(document.getElementById('compYr').value);}
+
+function buildCompMetrics(){
+  const yr=getCompYr();
+  const cohort=projectCohort(yr,compSc);
+  const dep=calcDep(cohort);
+  const base=calcDep(COHORT24);
+  const chg=dep.total-base.total;
+  const lb={p:'비관',b:'기준',o:'낙관',c:'사용자'}[compSc];
+  const elderStatus=dep.elderPct>=20?'🔴 초고령사회':dep.elderPct>=14?'🟡 고령사회':'🟢 고령화사회';
+  document.getElementById('compMetrics').innerHTML=`
+    <div class="mc blue"><div class="mc-lbl">${yr}년 총인구 (${lb})</div><div class="mc-val">${dep.total.toLocaleString()}</div><div class="mc-sub">${chg>=0?'+':''}${chg.toLocaleString()}명 (2024 대비)</div></div>
+    <div class="mc red"><div class="mc-lbl">고령인구 비율 (60세+)</div><div class="mc-val">${dep.elderPct}%</div><div class="mc-sub">${elderStatus}</div></div>
+    <div class="mc amber"><div class="mc-lbl">총 부양비</div><div class="mc-val">${dep.totalDep}</div><div class="mc-sub">노년 ${dep.oldDep} · 유소년 ${dep.youngDep}</div></div>
+    <div class="mc green"><div class="mc-lbl">생산가능인구 (20~59세)</div><div class="mc-val">${dep.workPct}%</div><div class="mc-sub">${dep.work.toLocaleString()}명</div></div>`;
+}
+
+function buildCompDonut(){
+  dc('compDonut');
+  const yr=getCompYr();
+  const cohort=projectCohort(yr,compSc);
+  const total=cohort.reduce((a,b)=>a+b,0);
+  document.getElementById('compDonutTitle').textContent=`${yr}년 연령대별 인구구성`;
+  document.getElementById('compLegend').innerHTML=AGE_LBL.map((l,i)=>
+    `<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:${AGE_COL[i]};flex-shrink:0"></span>${l}: ${cohort[i].toLocaleString()}명 (${(cohort[i]/total*100).toFixed(1)}%)</span>`
+  ).join('');
+  charts['compDonut']=new Chart(document.getElementById('compDonut').getContext('2d'),{
+    type:'doughnut',
+    data:{labels:AGE_LBL,datasets:[{data:cohort,backgroundColor:AGE_COL,borderColor:'#fff',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw.toLocaleString()}명 (${(c.raw/total*100).toFixed(1)}%)`}}}}
+  });
+}
+
+function buildCompStack(){
+  dc('compStack');
+  const years=[2024,2026,2028,2030,2032,2034,2036,2038,2040];
+  const datasets=AGE_LBL.map((label,i)=>({
+    label,
+    data:years.map(y=>projectCohort(y,compSc)[i]),
+    backgroundColor:AGE_COL[i]+'cc',
+    borderColor:AGE_COL[i],
+    borderWidth:1,
+  }));
+  charts['compStack']=new Chart(document.getElementById('compStack').getContext('2d'),{
+    type:'bar',
+    data:{labels:years,datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10,padding:5}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.raw.toLocaleString()}명`}}},
+      scales:{x:{stacked:true,ticks:yFont()},y:{stacked:true,ticks:{callback:v=>(v/10000).toFixed(0)+'만',...yFont()},grid:GRID}}}
+  });
+}
+
+function buildCompDep(){
+  dc('compDep');
+  const years=[2024,2026,2028,2030,2032,2034,2036,2038,2040];
+  charts['compDep']=new Chart(document.getElementById('compDep').getContext('2d'),{
+    type:'line',
+    data:{labels:years,datasets:[
+      {label:'총부양비',data:years.map(y=>calcDep(projectCohort(y,compSc)).totalDep),borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.06)',borderWidth:2.5,pointRadius:4,fill:true,tension:.35},
+      {label:'노년부양비',data:years.map(y=>calcDep(projectCohort(y,compSc)).oldDep),borderColor:'#f59e0b',borderWidth:2,pointRadius:3,borderDash:[4,3],tension:.35},
+      {label:'유소년부양비',data:years.map(y=>calcDep(projectCohort(y,compSc)).youngDep),borderColor:'#3b82f6',borderWidth:2,pointRadius:3,borderDash:[4,3],tension:.35},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.raw}`}}},
+      scales:{x:{ticks:yFont()},y:{ticks:yFont(),grid:GRID}}}
+  });
+}
+
+function buildCompDelta(){
+  dc('compDelta');
+  const yr=getCompYr();
+  const base=[...COHORT24];
+  const target=projectCohort(yr,compSc);
+  const deltas=AGE_LBL.map((_,i)=>target[i]-base[i]);
+  document.getElementById('compDeltaTitle').textContent=`2024 대비 ${yr}년 연령대별 변화`;
+  charts['compDelta']=new Chart(document.getElementById('compDelta').getContext('2d'),{
+    type:'bar',
+    data:{labels:AGE_LBL,datasets:[{
+      data:deltas,
+      backgroundColor:deltas.map(v=>v>=0?'rgba(34,197,94,.8)':'rgba(239,68,68,.8)'),
+      borderColor:deltas.map(v=>v>=0?'#22c55e':'#ef4444'),
+      borderWidth:1.5,borderRadius:4
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw>=0?'+':''}${Math.round(c.raw).toLocaleString()}명`}}},
+      scales:{x:{ticks:{callback:v=>v.toLocaleString(),...yFont()},grid:GRID},y:{ticks:yFont()}}}
+  });
+}
+
+function buildCompTbl(){
+  const years=[2024,2025,2027,2030,2033,2035,2037,2040];
+  let html='<thead><tr><th>연령대</th>'+years.map(y=>`<th>${y}</th>`).join('')+'</tr></thead><tbody>';
+  AGE_LBL.forEach((label,i)=>{
+    const vals=years.map(y=>projectCohort(y,compSc)[i]);
+    html+=`<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${AGE_COL[i]};margin-right:5px"></span>${label}</td>`+
+      vals.map(v=>`<td>${v.toLocaleString()}</td>`).join('')+'</tr>';
+  });
+  html+='<tr class="comp-tot"><td>총 인구</td>'+years.map(y=>`<td>${projectCohort(y,compSc).reduce((a,b)=>a+b,0).toLocaleString()}</td>`).join('')+'</tr>';
+  html+='<tr class="comp-old"><td>고령비율(60세+)</td>'+years.map(y=>{
+    const c=projectCohort(y,compSc);const t=c.reduce((a,b)=>a+b,0);
+    return`<td>${((c[6]+c[7]+c[8])/t*100).toFixed(1)}%</td>`;
+  }).join('')+'</tr>';
+  html+='<tr class="comp-dep"><td>총 부양비</td>'+years.map(y=>`<td>${calcDep(projectCohort(y,compSc)).totalDep}</td>`).join('')+'</tr>';
+  html+='</tbody>';
+  document.getElementById('compTbl').innerHTML=html;
+}
+
+function refreshComp(){
+  buildCompMetrics();
+  buildCompDonut();
+  buildCompStack();
+  buildCompDep();
+  buildCompDelta();
+  buildCompTbl();
+}
+
+function onCompYr(){
+  document.getElementById('compYrVal').textContent=getCompYr();
+  buildCompMetrics();
+  buildCompDonut();
+  buildCompDelta();
+}
+
+function copyCompTbl(){
+  const t=document.getElementById('compTbl');
+  let txt='';t.querySelectorAll('tr').forEach(r=>{txt+=[...r.querySelectorAll('th,td')].map(c=>c.innerText.replace(/\n/g,' ')).join('\t')+'\n';});
+  navigator.clipboard.writeText(txt).then(()=>alert('복사되었습니다.'));
+}
+
+// ============================================================
+// PAGE: 연령 피라미드
+// ============================================================
+function drawPyramid(){
+  dc('pyrChart');
+  const yr=parseInt(document.getElementById('pyrYr').value);
+  const d=PYR[yr];
+  const maxV=Math.max(...d.m,...d.f);
+  charts['pyrChart']=new Chart(document.getElementById('pyrChart').getContext('2d'),{
+    type:'bar',
+    data:{labels:AGE_LBL.slice().reverse(),datasets:[
+      {label:'남성',data:[...d.m].reverse().map(v=>-v),backgroundColor:'rgba(59,130,246,.8)',borderColor:'#3b82f6',borderWidth:1},
+      {label:'여성',data:[...d.f].reverse(),backgroundColor:'rgba(236,72,153,.8)',borderColor:'#ec4899',borderWidth:1},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${Math.abs(Math.round(c.raw)).toLocaleString()}명`}}},
+      scales:{x:{ticks:{callback:v=>`${Math.abs(v/1000).toFixed(0)}천`,...yFont()},min:-maxV*1.15,max:maxV*1.15,grid:GRID},y:{ticks:yFont()}}}
+  });
+  const totalM=d.m.reduce((a,b)=>a+b,0),totalF=d.f.reduce((a,b)=>a+b,0),total=totalM+totalF;
+  const old60=([...d.m,...d.f].slice(12)).reduce((a,b)=>a+b,0); // 60세+
+  const elderPct=(old60/total*100).toFixed(1);
+  document.getElementById('pyrInsight').innerHTML=
+    `<strong>${yr}년${yr>=2025?' (예측)':''} 주요 지표</strong>
+    총인구: ${total.toLocaleString()}명 &nbsp;·&nbsp; 남성: ${totalM.toLocaleString()}명 &nbsp;·&nbsp; 여성: ${totalF.toLocaleString()}명<br>
+    60세 이상: ${old60.toLocaleString()}명 (${elderPct}%) ${parseFloat(elderPct)>=20?'<span style="background:#fef2f2;color:#dc2626;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700">초고령사회</span>':parseFloat(elderPct)>=14?'<span style="background:#fffbeb;color:#d97706;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700">고령사회</span>':''}`;
+}
+
+function buildPyrRatio(){
+  dc('pyrRatio');
+  const years=[2010,2016,2024,2030,2040];
+  function getRatio(yr,si,ei){
+    const d=PYR[yr];
+    const all=[...d.m,...d.f];
+    const total=all.reduce((a,b)=>a+b,0);
+    const sub=all.filter((_,i)=>(i%9)>=si&&(i%9)<=ei).reduce((a,b)=>a+b,0);
+    // 더 간단하게: 남+여 합산 후 인덱스로 슬라이스
+    const merged=d.m.map((v,i)=>v+d.f[i]);
+    const tot=merged.reduce((a,b)=>a+b,0);
+    const part=merged.slice(si,ei+1).reduce((a,b)=>a+b,0);
+    return+(part/tot*100).toFixed(1);
+  }
+  charts['pyrRatio']=new Chart(document.getElementById('pyrRatio').getContext('2d'),{
+    type:'line',
+    data:{labels:years,datasets:[
+      {label:'0~19세',data:years.map(y=>getRatio(y,0,1)),borderColor:'#3b82f6',pointRadius:4,tension:.3,borderWidth:2},
+      {label:'20~59세',data:years.map(y=>getRatio(y,2,5)),borderColor:'#8b5cf6',pointRadius:4,tension:.3,borderWidth:2},
+      {label:'60세 이상',data:years.map(y=>getRatio(y,6,8)),borderColor:'#ef4444',pointRadius:4,tension:.3,borderWidth:2,borderDash:[4,2]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}}},
+      scales:{x:{ticks:yFont()},y:{ticks:{callback:v=>v+'%',...yFont()},grid:GRID}}}
+  });
+}
+
+function buildPyrAging(){
+  dc('pyrAging');
+  const years=[2010,2016,2024,2030,2040];
+  function agingIdx(yr){
+    const d=PYR[yr];
+    const young=(d.m[0]+d.f[0])+(d.m[1]+d.f[1]);
+    const old=d.m.slice(6).reduce((a,b)=>a+b,0)+d.f.slice(6).reduce((a,b)=>a+b,0);
+    return+(old/young*100).toFixed(1);
+  }
+  charts['pyrAging']=new Chart(document.getElementById('pyrAging').getContext('2d'),{
+    type:'line',
+    data:{labels:years,datasets:[{
+      label:'고령화지수',data:years.map(agingIdx),
+      borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.06)',
+      borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#ef4444',fill:true,tension:.3
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:yFont()},y:{ticks:yFont(),grid:GRID}}}
+  });
+}
+
+// ============================================================
+// PAGE: 읍면동별
+// ============================================================
+function renderDist(){
+  const sort=document.getElementById('distSort').value;
+  let data=[...DIST];
+  if(sort==='pop')data.sort((a,b)=>b.p24-a.p24);
+  else if(sort==='change')data.sort((a,b)=>(a.p24-a.p16)-(b.p24-b.p16));
+  else data.sort((a,b)=>((a.p24-a.p16)/a.p16)-((b.p24-b.p16)/b.p16));
+  const maxP=Math.max(...data.map(d=>d.p24));
+  document.getElementById('distList').innerHTML=data.map(d=>{
+    const chg=d.p24-d.p16,rate=(chg/d.p16*100).toFixed(1),pct=(d.p24/maxP*100).toFixed(0);
+    return`<div class="drow"><span class="dn">${d.name}</span><div class="dbw"><div class="db" style="width:${pct}%"></div></div><span class="dv">${d.p24.toLocaleString()}</span><span class="dc" style="color:${chg>=0?'#16a34a':'#dc2626'}">${chg>=0?'+':''}${chg.toLocaleString()}<br><span style="font-size:10px">(${rate}%)</span></span></div>`;
+  }).join('');
+}
+
+function buildDistPie(){
+  dc('distPie');
+  const top=DIST.slice().sort((a,b)=>b.p24-a.p24).slice(0,7);
+  const other=DIST.reduce((s,d)=>s+d.p24,0)-top.reduce((s,d)=>s+d.p24,0);
+  const cols=['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#22c55e','#14b8a6','#ef4444','#9ca3af'];
+  charts['distPie']=new Chart(document.getElementById('distPie').getContext('2d'),{
+    type:'doughnut',
+    data:{labels:[...top.map(d=>d.name),'기타'],datasets:[{data:[...top.map(d=>d.p24),other],backgroundColor:cols,borderColor:'#fff',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}},
+        tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw.toLocaleString()}명 (${(c.raw/DIST.reduce((s,d)=>s+d.p24,0)*100).toFixed(1)}%)`}}}}
+  });
+}
+
+function buildDistBar(){
+  dc('distBar');
+  const data=DIST.filter(d=>d.name!=='기 타').sort((a,b)=>(b.p24-b.p16)-(a.p24-a.p16));
+  const changes=data.map(d=>d.p24-d.p16);
+  charts['distBar']=new Chart(document.getElementById('distBar').getContext('2d'),{
+    type:'bar',
+    data:{labels:data.map(d=>d.name),datasets:[{
+      data:changes,
+      backgroundColor:changes.map(v=>v>=0?'rgba(34,197,94,.8)':'rgba(239,68,68,.8)'),
+      borderColor:changes.map(v=>v>=0?'#22c55e':'#ef4444'),
+      borderWidth:1.5,borderRadius:4
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Math.round(c.raw).toLocaleString()}명`}}},
+      scales:{x:{ticks:{...yFont(),maxRotation:45}},y:{ticks:{callback:v=>v.toLocaleString(),...yFont()},grid:GRID}}}
+  });
+}
+
+// ============================================================
+// PAGE: 요인별 분석
+// ============================================================
+function buildFactLine(){
+  dc('factLine');
+  charts['factLine']=new Chart(document.getElementById('factLine').getContext('2d'),{
+    type:'line',
+    data:{labels:HIST.map(d=>d.year),datasets:[
+      {label:'출생',data:HIST.map(d=>d.births),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.06)',borderWidth:2,pointRadius:3,tension:.3,fill:true},
+      {label:'사망',data:HIST.map(d=>d.deaths),borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.06)',borderWidth:2,pointRadius:3,tension:.3,fill:true},
+      {label:'순이동',data:HIST.map(d=>d.inflow-d.outflow),borderColor:'#8b5cf6',borderWidth:2,borderDash:[5,3],pointRadius:3,tension:.3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},tooltip:TIP},
+      scales:{x:{ticks:xFont()},y:{ticks:{callback:v=>v.toLocaleString(),...yFont()},grid:GRID}}}
+  });
+}
+
+function buildFactBar(){
+  dc('factBar');
+  charts['factBar']=new Chart(document.getElementById('factBar').getContext('2d'),{
+    type:'bar',
+    data:{labels:HIST.map(d=>d.year),datasets:[
+      {label:'자연증가',data:HIST.map(d=>d.births-d.deaths),backgroundColor:'rgba(59,130,246,.75)',borderColor:'#3b82f6',borderWidth:1,borderRadius:3},
+      {label:'사회증감',data:HIST.map(d=>d.inflow-d.outflow),backgroundColor:'rgba(239,68,68,.75)',borderColor:'#ef4444',borderWidth:1,borderRadius:3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},tooltip:TIP},
+      scales:{x:{ticks:xFont()},y:{ticks:{callback:v=>v.toLocaleString(),...yFont()},grid:GRID}}}
+  });
+}
+
+function buildFactYouth(){
+  dc('factYouth');
+  charts['factYouth']=new Chart(document.getElementById('factYouth').getContext('2d'),{
+    type:'line',
+    data:{labels:YOUTH.map(d=>d.year),datasets:[{
+      label:'청년인구(19~39세)',data:YOUTH.map(d=>d.pop),
+      borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.07)',
+      borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#f59e0b',tension:.3,fill:true
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` 청년인구: ${Math.round(c.raw).toLocaleString()}명`}}},
+      scales:{x:{ticks:yFont()},y:{ticks:{callback:v=>(v/10000).toFixed(1)+'만',...yFont()},grid:GRID,min:50000,max:85000}}}
+  });
+}
+
+// ============================================================
+// PAGE: 데이터 테이블
+// ============================================================
+function buildTbl(){
+  const sc=document.getElementById('tblSc')?.value??'p';
+  const pr=project(sc);
+  const all=[...HIST.map(d=>({...d,type:'hist'})),...pr.map(d=>({...d,type:'proj'}))];
+  let html='<thead><tr><th>연도</th><th>구분</th><th>인구</th><th>전년대비</th><th>출생</th><th>사망</th><th>자연증가</th><th>순이동</th></tr></thead><tbody>';
+  for(let i=0;i<all.length;i++){
+    const d=all[i],prev=i>0?all[i-1].pop:null;
+    const delta=prev!==null?d.pop-prev:0;
+    const nat=d.births-d.deaths;
+    const netMig=d.netMig!==undefined?d.netMig:(d.inflow-d.outflow);
+    const cls=d.year===2024?' class="y24"':d.type==='proj'?' class="fut"':'';
+    const typeLbl=d.type==='proj'?'<span style="color:var(--blue);font-size:10px">▶ 예측</span>':'<span style="color:var(--g400);font-size:10px">실제</span>';
+    const ds=prev!==null?(delta>=0?'+':'')+delta.toLocaleString():'-';
+    html+=`<tr${cls}><td>${d.year}</td><td>${typeLbl}</td><td style="font-weight:600">${d.pop.toLocaleString()}</td><td style="color:${delta<0?'#dc2626':'#16a34a'}">${ds}</td><td>${d.births?d.births.toLocaleString():'-'}</td><td>${d.deaths?d.deaths.toLocaleString():'-'}</td><td style="color:${nat<0?'#dc2626':'#16a34a'}">${nat?(nat>=0?'+':'')+nat.toLocaleString():'-'}</td><td style="color:${netMig<0?'#dc2626':'#16a34a'}">${(netMig>=0?'+':'')+netMig.toLocaleString()}</td></tr>`;
+  }
+  html+='</tbody>';
+  document.getElementById('mainTbl').innerHTML=html;
+}
+
+function copyTbl(){
+  const t=document.getElementById('mainTbl');
+  let txt='';t.querySelectorAll('tr').forEach(r=>{txt+=[...r.querySelectorAll('th,td')].map(c=>c.innerText.replace(/\n/g,' ')).join('\t')+'\n';});
+  navigator.clipboard.writeText(txt).then(()=>alert('복사되었습니다.'));
+}
+
+// ============================================================
+// SCENARIO 전환
+// ============================================================
+function setSc(sc, btn, page){
+  if(page==='overview'){
+    ovSc=sc;
+    btn.closest('.sc-row').querySelectorAll('.sc').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('ovCtrls').style.display=sc==='c'?'grid':'none';
+    refreshOverview();
+  } else {
+    compSc=sc;
+    btn.closest('.sc-row').querySelectorAll('.sc').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    refreshComp();
+  }
+}
+
+function onOvCtrl(){
+  const br=parseFloat(document.getElementById('ov-birth').value);
+  const dr=parseFloat(document.getElementById('ov-death').value);
+  const nd=parseFloat(document.getElementById('ov-net').value);
+  document.getElementById('ov-bv').textContent=(br>=0?'+':'')+br+'%';
+  document.getElementById('ov-dv').textContent=(dr>=0?'+':'')+dr+'%';
+  document.getElementById('ov-nv').textContent=(nd>=0?'+':'')+nd.toLocaleString();
+  SC.c={birthRate:br/100,deathRate:dr/100,netDelta:nd};
+  refreshOverview();
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function goPage(id, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='composition') refreshComp();
+  else if(id==='pyramid'){drawPyramid();buildPyrRatio();buildPyrAging();}
+  else if(id==='district'){renderDist();buildDistPie();buildDistBar();}
+  else if(id==='factors'){buildFactLine();buildFactBar();buildFactYouth();}
+  else if(id==='table') buildTbl();
+}
+
+// ============================================================
+// PDF 내보내기
+// ============================================================
+async function exportPDF(){
+  const btn=document.querySelector('.btn-o');
+  btn.textContent='📄 변환 중...';btn.disabled=true;
+  try{
+    const{jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const area=document.getElementById('printArea');
+    const canvas=await html2canvas(area,{scale:1.5,useCORS:true,backgroundColor:'#f9fafb'});
+    const imgData=canvas.toDataURL('image/png');
+    const pdfW=pdf.internal.pageSize.getWidth();
+    const pdfH=canvas.height*pdfW/canvas.width;
+    const pageH=pdf.internal.pageSize.getHeight();
+    let y=0;
+    while(y<pdfH){if(y>0)pdf.addPage();pdf.addImage(imgData,'PNG',0,-y,pdfW,pdfH);y+=pageH;}
+    pdf.save('익산시_인구예측모델.pdf');
+  }catch(e){alert('PDF 변환 오류: '+e.message);}
+  btn.textContent='📥 PDF 내보내기';btn.disabled=false;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+buildOvMetrics();
+buildOvMain();
+buildOvDecomp();
+buildOvBar40();
+</script>
+</body>
+</html>
